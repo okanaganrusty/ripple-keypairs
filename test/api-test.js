@@ -3,7 +3,6 @@
 const assert = require('assert')
 const fixtures = require('./fixtures/api.json')
 const api = require('../dist')
-const decodeSeed = api.decodeSeed
 const entropy = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 
 describe('api', () => {
@@ -14,7 +13,7 @@ describe('api', () => {
   it('generateSeed - secp256k1, random', () => {
     const seed = api.generateSeed()
     assert(seed.charAt(0) === 's')
-    const {type, bytes} = decodeSeed(seed)
+    const {type, bytes} = api.decodeSeed(seed)
     assert(type === 'secp256k1')
     assert(bytes.length === 16)
   })
@@ -27,7 +26,7 @@ describe('api', () => {
   it('generateSeed - ed25519, random', () => {
     const seed = api.generateSeed({algorithm: 'ed25519'})
     assert(seed.slice(0, 3) === 'sEd')
-    const {type, bytes} = decodeSeed(seed)
+    const {type, bytes} = api.decodeSeed(seed)
     assert(type === 'ed25519')
     assert(bytes.length === 16)
   })
@@ -95,5 +94,36 @@ describe('api', () => {
     const keypair = api.deriveKeypair(seed)
     const address = api.deriveAddress(keypair.publicKey)
     assert(address[0] === 'r')
+  })
+
+  describe('Tagged Addresses', () => {
+    it('decodes an address with no tag and no checksum', () => {
+      const address = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh'
+      const decoded = api.inspectAddress(address)
+      assert.deepStrictEqual(decoded, {
+        versionByte: '00',
+        hash160: 'b5f762798a53d543a014caf8b297cff8f2f937e8',
+        check: 'bf32ba9f',
+        check_valid: true,
+        version_valid: true })
+    })
+
+    it('decodes an address with no tag but with checksum', () => {
+      const address = 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyThADS'
+      const decoded = api.inspectAddress(address)
+      assert.deepStrictEqual(decoded, {
+        versionByte: '00',
+        hash160: 'b5f762798a53d543a014caf8b297cff8f2f937e8',
+        check: 'bf32ba9f',
+        check_valid: true,
+        version_valid: true,
+        address: 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh',
+        tag: null,
+        checksum_base32: 'ADS',
+        checksum: '0070',
+        crc_valid: true,
+        crc: '70'
+      })
+    })
   })
 })

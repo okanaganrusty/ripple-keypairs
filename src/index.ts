@@ -117,6 +117,94 @@ function deriveNodeAddress(publicKey) {
 }
 
 const decodeSeed = addressCodec.decodeSeed
+const decodeAddress = addressCodec.decodeAccountID
+
+type AddressParts = {
+  versionByte: string, // hex
+  hash160: string, // 20 bytes = 160 bits, hex
+  check: string, // take the versionByte + hash160, perform sha256 twice, and slice the first 4 bytes, hex
+  check_valid: boolean,
+  version_valid: boolean
+}
+
+const baseCodec = require('./ripple-address-codec/base-x')
+const createHash = require('create-hash')
+
+// Decode Account ID into its constituent parts
+function inspectAddress(address): AddressParts {
+  const alphabet = 'rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz' // XRP
+  const codec = baseCodec(alphabet) // TODO: Cache - do once and reuse result
+  const buffer = codec.decode(address) // raw
+  if (buffer.length < 5) {
+    throw new Error('invalid_input_size: decoded data must have length >= 5')
+  }
+
+  const nontaggedAddressDetails = inspectNontaggedAddressBuffer(buffer)
+  if (buffer.length === 1 + 20 + 4) {
+    return nontaggedAddressDetails
+  } else {
+    // Tagged Address
+
+    const base32 = baseCodec('ABCDEFGHJKLMNPQRSTUVWXYZ12345679')
+    const checksumLength = 3
+    const checksum_base32 = address ? address.slice(-checksumLength) : 'TODO: ERROR'
+
+    // Decode last 3 characters
+    const checksum = base32.decode(checksum_base32)
+    const has_tag = Boolean(checksum & 0x40)
+    const crc = checksum ? checksum.slice(-1) : [0]
+    const tagLength = 0 // TODO
+
+    return Object.assign({}, nontaggedAddressDetails, {
+      address: address ? address.slice(0, -(checksumLength + tagLength)) : 'TODO: ERROR',
+      tag: has_tag ? 'TODO' : null,
+      checksum_base32,
+      checksum: checksum ? checksum.toString('hex') : 'TODO: ERROR',
+      crc_valid: true, // TODO
+      crc: crc.toString('hex')
+    })
+  }
+}
+
+function inspectNontaggedAddressBuffer(buffer) {
+  /**
+   * Verify checksum
+   */
+  const sha256 = function(bytes: Uint8Array) {
+    return createHash('sha256').update(Buffer.from(bytes)).digest()
+  }
+  // Take buffer excluding checksum, sha256 twice, and take first 4 bytes
+  const computed = sha256(sha256(buffer.slice(0, -4))).slice(0, 4)
+  const check = buffer.slice(-4) // from provided address
+  const seqEqual = function(arr1: number[], arr2: number[]) {
+    if (arr1.length !== arr2.length) {
+      return false
+    }
+
+    for (let i = 0; i < arr1.length; i++) {
+      if (arr1[i] !== arr2[i]) {
+        return false
+      }
+    }
+    return true
+  }
+  const check_valid = seqEqual(computed, check)
+  const withoutSum = buffer.slice(0, -4) // remove checksum (last 4 bytes)
+
+  const payloadLength = 20 // 160 bits, a hash160
+  const versionByte = withoutSum.slice(0, 1) // from provided address
+  const payload = withoutSum.slice(-payloadLength) // from provided address, hash160
+
+  const version_valid = seqEqual(versionByte, [0]) // ACCOUNT_ID version byte
+
+  return {
+    versionByte: versionByte.toString('hex'),
+    hash160: payload.toString('hex'),
+    check: check.toString('hex'),
+    check_valid,
+    version_valid
+  }
+}
 
 module.exports = {
   generateSeed,
@@ -125,5 +213,7 @@ module.exports = {
   verify,
   deriveAddress,
   deriveNodeAddress,
-  decodeSeed
+  decodeSeed,
+  decodeAddress,
+  inspectAddress
 }

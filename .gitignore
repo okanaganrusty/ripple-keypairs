@@ -1,5 +1,7 @@
 # .gitignore
 
+.nyc_output
+
 # Ignore vim swap files.
 *.swp
 

@@ -2,7 +2,7 @@
  * Codec class
  */
 
-const baseCodec = require('base-x')
+const baseCodec = require('./base-x')
 const {seqEqual, concatArgs} = require('./utils')
 
 class Codec {
@@ -107,7 +107,7 @@ class Codec {
       return ret
     }
 
-    // Assume that base58string is 'checked'
+    // If no `versions`, then assume that base58string is 'checked'
     return this.decodeChecked(base58string)
   }
 
