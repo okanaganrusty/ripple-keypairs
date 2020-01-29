@@ -144,6 +144,14 @@ function deriveNodeAddress(publicKey) {
   return deriveAddressFromBytes(accountPublicBytes)
 }
 
+function verifyKeyPair(address, secret) {
+  // https://www.xrpchat.com/topic/7804-good-way-to-check-if-secret-key-is-working/
+  const { publicKey, privateKey } = deriveKeypair(secret)
+  const derivedAddress = deriveAddress(publicKey)
+
+  return address == derivedAddress
+}
+
 const { decodeSeed } = addressCodec
 
 module.exports = {
@@ -154,4 +162,5 @@ module.exports = {
   deriveAddress,
   deriveNodeAddress,
   decodeSeed,
+  verifyKeyPair
 }
